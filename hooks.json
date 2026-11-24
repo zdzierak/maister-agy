@@ -1,0 +1,27 @@
+{
+  "maister-session-state": {
+    "enabled": true,
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "./scripts/session-start-reminder.sh",
+        "timeout": 10
+      }
+    ]
+  },
+  "maister-destructive-guard": {
+    "enabled": true,
+    "PreToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./scripts/block-destructive-commands.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

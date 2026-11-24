@@ -1,203 +1,175 @@
 <div align="center">
 
-# Maister
+# Maister for Google Antigravity
 
-**Structured, standards-aware development workflows for Claude Code**
+**Structured, standards-aware software development workflows for Google Antigravity (App, CLI `agy`, and IDE)**
 
-Describe what you want to build, and the plugin handles the rest - from specification through implementation to verification - while enforcing your project's coding standards at every step.
+Describe what you want to build, and Maister guides it from requirements and specification through planning and test-driven implementation to verification — enforcing your project's coding standards at every step.
 
 </div>
 
+> [!NOTE]
+> **Fork & Attribution**: `maister-agy` ([zdzierak/maister-agy](https://github.com/zdzierak/maister-agy)) is a fork of **[SkillPanel/maister](https://github.com/SkillPanel/maister)**, originally created by Marek Kaluzny ([SkillPanel](https://skillpanel.com)) and contributors as a plugin for **Claude Code**. This repository adapts the full Maister SDLC framework — orchestrators, skills, subagents, rules, lifecycle hooks, and MCP integration — to run natively in **Google Antigravity** (`agy`).
+
 ## What You Get
 
-- **Guided workflows** for features, bug fixes, enhancements, performance, migrations, research, and product design
-- **Auto-discovered standards** from your codebase - config files, source patterns, and documentation are analyzed and enforced throughout every workflow
-- **Test-driven implementation** with automated planning, incremental verification, and full test suite runs before completion
-- **Pause and resume** any workflow - state is preserved across sessions
-- **Production readiness checks** including code review, reality assessment, and pragmatic over-engineering detection
+- **Guided SDLC workflows** for features, bug fixes, enhancements, performance optimization, migrations, research, and interactive product design
+- **Auto-discovered coding standards** from your codebase — config files, source patterns, project docs, and PR/CI conventions are analyzed, stored in `.maister/docs/standards/`, and continuously enforced
+- **Test-driven implementation waves** with automated planning, parallel disjoint subagent execution (`invoke_subagent`), incremental test runs, and full-suite verification
+- **Pause and resume** any workflow — full execution state is persisted in `orchestrator-state.yml` with a live browser operator dashboard (`dashboard.html`) and HTML companion reports
+- **Production readiness & quality audits** including code review, specification auditing, reality assessment, and pragmatic over-engineering detection
 
 ## Getting Started
 
 ### Prerequisites
 
-- [Claude Code](https://claude.ai/code) CLI installed and configured
-- Node.js 20 or newer for HTML mockups (optional — without it, mockups fall back to ASCII)
+- **Google Antigravity** — Antigravity CLI (`agy`), Antigravity App, or Antigravity IDE
+- **Node.js 20+** *(optional)* — required for the browser HTML visual companion in `/maister-mockup-studio` and the bundled `@playwright/mcp` server (without Node.js, UI mockups automatically fall back to terminal ASCII)
 
 ### Installation
 
-```bash
-/plugin marketplace add SkillPanel/maister
-/plugin install maister@maister-plugins
-```
-
-After installing, restart Claude Code (`/exit` and relaunch) to ensure the plugin is fully loaded.
-
-On GitHub Copilot CLI, install the `maister-copilot` variant with `copilot plugin install` — from a registered marketplace (`copilot plugin marketplace add SkillPanel/maister`, then `copilot plugin install maister-copilot@maister-plugins`) or straight from the repository subdirectory (`copilot plugin install SkillPanel/maister:plugins/maister-copilot`). To run a local checkout instead, load it with `copilot --plugin-dir /path/to/maister/plugins/maister-copilot`; add `--add-dir` for the same path when the checkout sits outside your working directory, which grants file access to it. `--add-dir` on its own does not load a plugin. Then export `MAISTER_PLUGIN_ROOT` as the variant's [install notes](platforms/copilot-cli/README.md) describe, so HTML mockups can start their preview server.
-
-### Initial project setup
-
-Initialize your project to auto-detect coding standards and generate project documentation:
+#### Option 1: Install from GitHub via Antigravity CLI (`agy`)
 
 ```bash
-/maister:init
+agy plugin install https://github.com/zdzierak/maister-agy
 ```
 
-This scans your codebase and creates `.maister/` with standards, docs, and task folders. May take a few minutes on larger projects.
-
-If you have another project already using Maister, you can reuse its standards as a starting point:
+#### Option 2: Install from a local clone
 
 ```bash
-/maister:init --standards-from=/path/to/other-project
+git clone git@github.com:zdzierak/maister-agy.git
+agy plugin install ./maister-agy
 ```
 
-### First Workflow
+Or inside an interactive `agy` TUI session:
+
+```text
+/plugin install /path/to/maister-agy
+```
+
+Verify installation and discovered components (`23 skills`, `25 agents`, `1 rule`, `2 hooks`, `1 MCP server`):
 
 ```bash
-/maister:development Add user profile page with avatar upload
+agy plugin list
 ```
 
-Or just discuss your task with Claude and then run:
+> **Cross-surface sync**: Plugins installed via `agy plugin install` into `~/.gemini/config/plugins/maister` are available across both the **Antigravity CLI** and the **Antigravity App**. For workspace-only installation committed to version control, place or symlink the plugin folder at `.agents/plugins/maister/`.
 
-```bash
-/maister:development
+### Initial Project Setup
+
+Initialize your project to analyze the codebase, generate baseline project docs, and auto-discover coding standards:
+
+```text
+/maister-init
 ```
 
-The plugin picks up context from your conversation - no arguments needed.
+This creates `.maister/` (with `config.yml`, `docs/INDEX.md`, `docs/project/`, `docs/standards/`, and `tasks/`) and integrates `.maister/docs/INDEX.md` into your workspace `AGENTS.md` (or `GEMINI.md`).
 
-## How It Works
+To reuse standards from another project already using Maister:
 
-1. You describe a task - either as an argument or just in conversation
-2. The plugin classifies it (feature, bug, enhancement, etc.) and proposes a workflow
-3. You confirm, and it guides you through phases: **requirements → spec → plan → implement → verify**
-4. At each phase, it asks for your input and decisions
-5. You get tested, verified code with a detailed work log
-
-All artifacts are saved in `.maister/tasks/` organized by type and date.
-
-### Context-Aware Commands
-
-Every workflow command works without arguments. The plugin reads your current conversation to extract the task description and auto-detect the task type:
-
-```
-You: "The login page throws a 500 error when the session expires"
-You: /maister:development
-→ Auto-detects: bug fix, extracts description from conversation
+```text
+/maister-init --standards-from=/path/to/other-project
 ```
 
-```
-You: /maister:standards-update
-→ Scans conversation for patterns like "we always use..." or "prefer X over Y"
+### Starting Your First Workflow
+
+Run a workflow directly with a description:
+
+```text
+/maister-development Add user profile page with avatar upload
 ```
 
-You can always be explicit when you prefer - arguments and flags simply override the auto-detection.
+Or use the unified entry point to auto-classify any task, bug, or GitHub/Jira issue:
 
-## Supported Workflows
+```text
+/maister-work "Fix 500 error on login when session cookie expires"
+```
+
+Every workflow command also works **without arguments** — it extracts the task description from your active conversation context:
+
+```text
+You: The dashboard takes 6 seconds to render when a team has >500 items
+You: /maister-performance
+```
+
+## Supported Workflows & Commands
+
+### Workflow Orchestrators
 
 | Command | Use When |
 |---------|----------|
-| `/maister:development` | Features, bug fixes, enhancements |
-| `/maister:research` | Research with synthesis and solution design |
-| `/maister:performance` | Optimizing speed or resource usage |
-| `/maister:migration` | Changing technologies or patterns |
-| `/maister:product-design` | Product and feature design |
+| `/maister-work` | Unified entry point — classifies a new task or resumes an existing `.maister/tasks/` folder |
+| `/maister-development` | Features, bug fixes, enhancements, refactoring (14 adaptive phases, TDD Red/Green gates, UI mockups) |
+| `/maister-research` | Multi-source research with synthesis, solution brainstorming, C4 diagrams, and MADR decisions |
+| `/maister-performance` | Static bottleneck detection (N+1, missing indexes, O(n²), blocking I/O, memory leaks) + optimization |
+| `/maister-migration` | Framework, database, or architecture migrations with mandatory rollback and dual-run plans |
+| `/maister-product-design` | Interactive product/feature design from problem exploration to layered brief and visual prototypes |
+| `/maister-mockup-studio` | Standalone HTML/CSS browser visual companion (or ASCII fallback) bound to your real design tokens |
 
-Task type (feature/bug/enhancement) is auto-detected from context. Override with `--type=feature|bug|enhancement` if needed. Or use `/maister:work` as a single entry point that routes to the right workflow.
-
-### Quick Commands
-
-For smaller tasks that don't need a full workflow:
+### Quick Commands (No Task Directory)
 
 | Command | Use When |
 |---------|----------|
-| `/maister:quick-plan` | You want a plan with standards awareness before coding |
-| `/maister:quick-dev` | You know what to do - just implement with standards applied |
-| `/maister:quick-bugfix` | Quick TDD-driven bug fix — write failing test, fix, verify |
+| `/maister-quick-plan` | Draft a reviewable plan with a mandatory Standards Compliance Checklist before coding |
+| `/maister-quick-dev` | Implement a clear, scoped change directly with continuous standards enforcement |
+| `/maister-quick-bugfix` | Lightweight TDD bug fix (plan → failing test → fix → green test) with complexity escalation |
 
-## Standards-Aware Development
+### Standards & Standalone Reviews
 
-This is the key differentiator. Maister doesn't just run workflows - it learns your project's conventions and enforces them:
+| Command | Use When |
+|---------|----------|
+| `/maister-init` | Initialize `.maister/`, project docs, `AGENTS.md` / `GEMINI.md` integration, and standards discovery |
+| `/maister-standards-discover` | Scan config files, code patterns, docs, PRs, and CI/CD in parallel for coding conventions |
+| `/maister-standards-update` | Add/refine standards from conversation context, description, or `--from=PATH` project sync |
+| `/maister-reviews-code` | Automated code quality, security, and performance review (`--scope=quality\|security\|performance\|all`) |
+| `/maister-reviews-pragmatic` | Detect over-engineering and unnecessary complexity relative to project scale |
+| `/maister-reviews-spec-audit` | Independent pre- or `--post-implementation` specification audit |
+| `/maister-reviews-reality-check` | End-to-end reality check comparing claimed vs actual completion |
+| `/maister-reviews-production-readiness` | 7-dimension GO/NO-GO pre-deployment verification (`--target=prod\|staging`) |
 
-- **`/maister:init`** scans config files, source code, and documentation to auto-detect your coding standards
-- **Continuous checking** - standards are consulted before specification, during planning, and while coding (not just at the start)
-- **`/maister:standards-discover`** refreshes standards from your evolving codebase
-- **`/maister:standards-update`** lets you add or refine standards manually, or sync from another project with `--from=PATH`
+## Best Practices in Google Antigravity
 
-Standards live in `.maister/docs/standards/` and are indexed in `.maister/docs/INDEX.md`.
+- **Use `auto` or `accept-edits` mode, not `/plan` mode, for full orchestrators.** Orchestrator workflows write state (`orchestrator-state.yml`), specs, plans, and dashboards under `.maister/tasks/` as they progress, and pause for your input at every `→ MANDATORY GATE` via Antigravity's native `ask_question` UI. Running inside read-only `/plan` mode blocks artifact creation.
+- **Monitor parallel subagents live.** During codebase analysis, research gathering, implementation waves, and verification, Maister launches concurrent background subagents via `invoke_subagent`. Inspect them anytime in the **Subagents** side panel (App) or `/agents` (`Alt+J` / `Ctrl+K` for fast approvals in CLI).
+- **Start chained workflows in a fresh session (`/clear` / New Conversation).** Pass a completed research or product-design directory directly to `/maister-development`:
+  ```text
+  /maister-development .maister/tasks/research/2026-11-24-oauth-research
+  /maister-development .maister/tasks/product-design/2026-11-24-dashboard-redesign
+  ```
+- **Resume anytime.** If a session is closed or compacted, resume from disk state by passing the task folder:
+  ```text
+  /maister-development .maister/tasks/development/2026-11-24-my-feature
+  ```
 
-**Important**: Run workflows with **auto-accept edits** enabled. Do not use Claude Code's plan mode with workflows (see [Best Practices](#best-practices) below).
+## How This Fork Adapts Claude Code Maister to Antigravity
 
-## Beta Channel
+| Area | Original (`SkillPanel/maister` for Claude Code) | `maister-agy` (Google Antigravity) |
+|------|-------------------------------------------------|------------------------------------|
+| **Manifest** | `.claude-plugin/plugin.json` + `marketplace.json` | Root `plugin.json` (`antigravity.google/schemas/v1/plugin.json`) |
+| **Slash commands** | `/maister:*` across `commands/` + `skills/` | Unified `/maister-*` skills in `skills/<name>/SKILL.md` |
+| **Large orchestrators** | Monolithic `SKILL.md` up to 55 KB | Progressive disclosure: `SKILL.md` (<24 KB) + `references/workflow-phases.md` |
+| **Subagent delegation** | Synchronous `Task` tool (`subagent_type`, `Explore`) | Async `invoke_subagent` (`TypeName`, built-in `research` & `self`) |
+| **Skill delegation** | `Skill` tool | Main-context `read_file` execution of sibling `SKILL.md` |
+| **Interactive gates** | `AskUserQuestion` | Native `ask_question` (single- & multi-select + `(Recommended)`) |
+| **Live progress** | `TaskCreate` / `TaskUpdate` (`addBlockedBy`) | Native `update_steps` live checklist + `orchestrator-state.yml` |
+| **Workspace rules** | `CLAUDE.md` | Always-on plugin `rules/AGENTS.md` + project `AGENTS.md` / `GEMINI.md` |
+| **Lifecycle hooks** | `hooks/hooks.json` (`Bash`, `CLAUDE_PLUGIN_ROOT`) | Root `hooks.json` + `./scripts/*.sh` (`run_command`, camelCase JSON) |
+| **MCP configuration** | `.mcp.json` | `mcp_config.json` (`@playwright/mcp@0.0.83`) |
 
-Want to try experimental features before they hit stable? Install from the beta channel:
-
-```bash
-# Add the beta marketplace
-/plugin marketplace add SkillPanel/Maister#beta
-
-# Install the beta plugin
-/plugin install maister@maister-plugins-beta
-```
-
-If you already have the stable version installed, uninstall it first to avoid conflicts:
-
-```bash
-/plugin uninstall maister@maister-plugins
-```
-
-To switch back to stable:
-
-```bash
-/plugin uninstall maister@maister-plugins-beta
-/plugin install maister@maister-plugins
-```
-
-Beta versions may contain features that are not yet fully tested. Use at your own discretion.
-
-## Staying on 2.x
-
-Maister 3.0 does not resume task directories created by 2.x, so a task started on 2.x should be finished on 2.x. To stay on 2.x, install from the 2.x maintenance line:
-
-```bash
-# Add the 2.x marketplace
-/plugin marketplace add SkillPanel/maister#release/2.x
-
-# Install the 2.x plugin
-/plugin install maister@maister-plugins-2x
-```
-
-If another channel is installed, uninstall it first (for example `/plugin uninstall maister@maister-plugins`).
-
-The 2.x line receives fixes only — no new features — for six months after 3.0.0 is released.
-
-On GitHub Copilot CLI, check out the `release/2.x` branch and load its `plugins/maister-copilot` directory with `copilot --plugin-dir`, as described under [Installation](#installation).
-
-## Best Practices
-
-**Don't use plan mode when starting a workflow.** Planning is a built-in part of every workflow — the orchestrator creates specs, plans, and other files as it goes. Claude Code's plan mode restricts file creation, which conflicts with this. Let the workflow handle planning on its own.
-
-**Start workflows in a fresh session.** This is especially useful when chaining workflows (e.g., research → development). Research and product-design artifacts already contain all the context needed, so a clean session avoids noise from prior conversation.
-
-**Chain workflows by passing a task folder.** If you've completed a research or product-design workflow and want to build on those results, pass the task folder directly:
+## Validation & Development
 
 ```bash
-/maister:development .maister/tasks/research/2026-01-12-oauth-research
-```
-
-You can also append additional instructions to narrow scope or guide the workflow:
-
-```bash
-/maister:development .maister/tasks/product-design/2026-03-10-dashboard-redesign Implement only phase 1
-```
-
-## Known Issues
-
-**Orchestrator may stall after long phases.** After context compaction (which typically happens after lengthy phases like implementation), the main agent may stop progressing automatically. If you notice it's idle, just type something like "continue" or "proceed" — it will pick up where it left off. You can also re-invoke the workflow in resume mode to reload the orchestrator state:
-
-```bash
-/maister:development .maister/tasks/development/2026-03-24-my-feature
+# Run strict Antigravity plugin validation + repository consistency checks
+make validate
 ```
 
 ## Learn More
 
-- [Workflow Details](docs/workflows.md) - phases, examples, and task structure for each workflow type
-- [Full Command Reference](docs/commands.md) - all workflow, review, utility, and quick commands
+- [Workflow Details](docs/workflows.md) — phases, state structure, and handoffs for every workflow
+- [Full Command Reference](docs/commands.md) — flags, examples, and options for all 18 `/maister-*` commands
+- [Plugin Architecture & Contributor Guide](docs/architecture.md) — internal skills, subagents, hooks, and authoring rules
+- Upstream project: [SkillPanel/maister](https://github.com/SkillPanel/maister)
+
+## License
+
+MIT — see [LICENSE](LICENSE). Original work Copyright (c) 2025-2026 Marek Kaluzny (SkillPanel.com) and Maister contributors.

@@ -1,33 +1,36 @@
 # Command Reference
 
+> **Note**: In Google Antigravity, all user-facing Maister commands are packaged as skills in `skills/maister-*/SKILL.md` and exposed automatically as `/maister-*` slash commands in both the Antigravity App and Antigravity CLI (`agy`). Originally adapted from [SkillPanel/maister](https://github.com/SkillPanel/maister) for Claude Code.
+
 ## Unified Entry Point
 
-### `/maister:work [input]`
+### `/maister-work [input]`
 
-Auto-classifies your task and routes to the appropriate workflow. Accepts:
+Auto-classifies your task and routes to the appropriate workflow orchestrator. Accepts:
 
 - **No arguments**: Extracts the task from your current conversation context
-- Task description: `/maister:work "Add user profile page"`
-- Task folder path: `/maister:work .maister/tasks/new-features/2026-02-17-user-profile` (resumes)
-- GitHub issue URL: `/maister:work https://github.com/org/repo/issues/42`
+- **Task description**: `/maister-work "Add user profile page"`
+- **Task folder path**: `/maister-work .maister/tasks/development/2026-11-24-user-profile` (resumes)
+- **Issue reference / URL**: `/maister-work #42` or `/maister-work https://github.com/org/repo/issues/42`
 
-The plugin classifies the task type with confidence scoring, asks for confirmation, then launches the matching orchestrator.
+Invokes the `task-classifier` subagent (`invoke_subagent`) for confidence-scored classification, confirms with you via `ask_question`, and launches the matching orchestrator.
 
 ---
 
 ## Development
 
-### `/maister:development [description | task-path]`
+### `/maister-development [description | task-path]`
 
-Starts the unified development workflow (14 adaptive phases) or resumes an existing one. All arguments are optional — when run without a description, the plugin extracts it from your current conversation. Pass an existing task path to resume. Task type (bug/enhancement/feature) is auto-detected from context when `--type` is omitted.
+Starts the unified development workflow (14 adaptive phases) or resumes an existing task. All arguments are optional — when run without a description, Maister extracts it from your current conversation. Pass an existing task path to resume, or pass a completed research / product-design task path to build on it.
 
 | Flag | Description |
 |------|-------------|
-| `--type=bug\|enhancement\|feature` | Specify task type (auto-detected if omitted) |
-| `--e2e` | Include E2E testing phase |
-| `--user-docs` | Generate user documentation phase |
-| `--code-review` | Include code review phase |
+| `--type=bug\|enhancement\|feature` | Override auto-detected task characteristics |
+| `--e2e` / `--no-e2e` | Force or skip runtime browser E2E verification phase |
+| `--user-docs` / `--no-user-docs` | Force or skip end-user documentation phase |
+| `--audit` / `--no-audit` | Force or skip independent specification audit |
 | `--research=PATH` | Start development informed by a completed research task |
+| `--sequential` | Disable parallel subagent wave dispatch; execute one task group at a time |
 | `--from=PHASE` | Start from or resume at a specific phase |
 | `--reset-attempts` | Reset failed attempt counters (resume) |
 
@@ -38,16 +41,15 @@ Starts the unified development workflow (14 adaptive phases) or resumes an exist
 
 ## Performance
 
-### `/maister:performance [description | task-path]`
+### `/maister-performance [description | task-path]`
 
-Starts performance optimization with static bottleneck analysis (9 phases) or resumes an existing one. Can be run without arguments — the plugin extracts the optimization target from your conversation. Detects N+1 queries, missing indexes, O(n^2) algorithms, blocking I/O, and memory leak patterns.
+Starts performance optimization with static bottleneck analysis (9 phases) or resumes an existing task. Detects N+1 queries, missing indexes, O(n²) algorithms, blocking I/O, and memory leak patterns, and optionally incorporates profiling artifacts placed in `analysis/user-profiling-data/`.
 
 | Flag | Description |
 |------|-------------|
+| `--sequential` | Execute implementation task groups sequentially instead of parallel waves |
 | `--from=PHASE` | Start from or resume at a specific phase |
 | `--reset-attempts` | Reset failed attempt counters (resume) |
-
-You can optionally provide profiling data (flame graphs, APM screenshots) — the workflow creates a directory for these.
 
 **Task directory**: `.maister/tasks/performance/`
 **Resume phases**: `analysis`, `specification`, `planning`, `implementation`, `verification`
@@ -56,14 +58,15 @@ You can optionally provide profiling data (flame graphs, APM screenshots) — th
 
 ## Migration
 
-### `/maister:migration [description | task-path]`
+### `/maister-migration [description | task-path]`
 
-Starts migration workflow (8 phases) with mandatory rollback planning and risk assessment, or resumes an existing one. Can be run without arguments — the plugin extracts migration details from your conversation.
+Starts the migration workflow (8 phases) with mandatory rollback planning, compatibility checks, and optional dual-run support, or resumes an existing migration.
 
 | Flag | Description |
 |------|-------------|
-| `--type=code\|data\|architecture\|general` | Migration type (affects risk focus) |
-| `--user-docs` | Generate the Phase 8 migration guide for end users |
+| `--type=code\|data\|architecture\|general` | Migration category (auto-classified in Phase 2 when omitted) |
+| `--user-docs` | Generate the Phase 8 end-user migration guide |
+| `--sequential` | Execute migration task groups sequentially |
 | `--from=PHASE` | Start from or resume at a specific phase |
 | `--reset-attempts` | Reset failed attempt counters (resume) |
 
@@ -74,60 +77,44 @@ Starts migration workflow (8 phases) with mandatory rollback planning and risk a
 
 ## Research
 
-### `/maister:research [question | task-path]`
+### `/maister-research [question | task-path]`
 
-Starts research workflow (8 phases) with multi-source gathering, synthesis, and optional solution brainstorming, or resumes an existing one. Can be run without arguments — the plugin extracts the research question from your conversation.
+Starts the multi-source research workflow (6 phases) with parallel `information-gatherer` subagents, pattern synthesis, optional solution brainstorming, and C4/MADR architecture design.
 
 | Flag | Description |
 |------|-------------|
 | `--type=technical\|requirements\|literature\|mixed` | Research methodology type |
-| `--brainstorm` | Force brainstorming + design phases |
-| `--no-brainstorm` | Skip brainstorming phases |
+| `--brainstorm` / `--no-brainstorm` | Force or skip solution brainstorming phases |
+| `--design` / `--no-design` | Force or skip high-level architecture design phase |
 | `--from=PHASE` | Start from or resume at a specific phase |
 | `--reset-attempts` | Reset failed attempt counters (resume) |
 
-Research output can feed into development: `/maister:development --research=.maister/tasks/research/...`
+Research output feeds directly into development: `/maister-development .maister/tasks/research/...`
 
 **Task directory**: `.maister/tasks/research/`
-**Resume phases**: `foundation`, `brainstorming-decision`, `brainstorming`, `design`, `outputs`, `verification`, `integration`
 
 ---
 
-## Product Design
+## Product Design & Mockups
 
-### `/maister:product-design [description | task-path]`
+### `/maister-product-design [description | task-path]`
 
-Starts the interactive product/feature design workflow (9 adaptive phases) or resumes an existing one. Transforms ideas into structured product briefs through collaborative exploration, iterative refinement, and visual prototyping. Can be run without arguments — the plugin extracts the design brief from your conversation.
+Starts the interactive product/feature design workflow (9 adaptive phases, 0–8) or resumes an existing design. Transforms ideas into structured, layered product briefs through collaborative problem exploration, unbiased alternative generation, iterative section-by-section specification, and visual prototyping.
 
 | Flag | Description |
 |------|-------------|
-| `--research=PATH` | Start design informed by a completed research task |
-| `--no-visual` | Skip browser-based visual companion (use ASCII mockups only) |
-| `--from=PHASE` | Start from or resume at a specific phase |
+| `--research=PATH` | Import findings from a completed research task |
+| `--no-visual` | Skip browser HTML visual companion and use terminal ASCII mockups |
+| `--from=PHASE` | Resume from a specific phase |
 | `--reset-attempts` | Reset failed attempt counters (resume) |
 
-Design output can feed directly into development: `/maister:development .maister/tasks/product-design/...`
+Design output feeds directly into development: `/maister-development .maister/tasks/product-design/...`
 
 **Task directory**: `.maister/tasks/product-design/`
-**Resume phases**: `context`, `synthesis`, `problem`, `personas`, `alternatives`, `convergence`, `specification`, `prototyping`, `handoff`
 
-### `/maister:mockup-studio "<screen or feature>"`
+### `/maister-mockup-studio "<screen or feature>"`
 
-Generates UI mockups for one screen or feature, on its own rather than as a step inside
-another workflow. It finds the project's design language first — standards, design
-system, component library, whatever design skills are installed — and binds the mockups
-to it by real token and component names, so what you see is what the codebase can
-actually build.
-
-Two formats. The default renders HTML and CSS in a browser through a local visual
-companion. Set `mockup_format: ascii` in `.maister/config.yml` for terminal ASCII, which
-shows layout and placement and nothing about style; HTML falls back to ASCII on its own
-when Node.js is unavailable.
-
-Between rounds it asks what to change and re-renders, so a screen converges in the
-session rather than in a handoff. The development and product-design workflows use the
-same skill at their mockup step, so a mockup made here and one made inside a workflow
-are the same artifact.
+Generates UI mockups standalone for a screen or feature. Discovers your project's real design language first (frontend standards, CSS tokens, Tailwind/theme config, component library) and renders interactive HTML/CSS previews via a zero-dependency local Node.js server (or terminal ASCII when `mockup_format: ascii` is set in `.maister/config.yml` or Node.js is unavailable).
 
 **Task directory**: `.maister/tasks/mockups/`
 
@@ -135,104 +122,62 @@ are the same artifact.
 
 ## Reviews & Audits
 
-Standalone review commands that can be run anytime, independent of workflows.
+Standalone read-only review commands powered by specialized subagents:
 
-### `/maister:reviews-code [path]`
+### `/maister-reviews-code [path] [--scope=quality|security|performance|all]`
+Automated code quality, security, and performance analysis with `Critical` / `Warning` / `Info` severity levels.
 
-Automated code quality, security, and performance analysis.
+### `/maister-reviews-pragmatic [path]`
+Detects over-engineering, premature abstraction, and infrastructure overkill relative to your project's actual scale.
 
-| Flag | Description |
-|------|-------------|
-| `--scope=quality\|security\|performance\|all` | Focus area (default: `all`) |
+### `/maister-reviews-reality-check [task-path]`
+Validates claimed vs actual completion end-to-end by running tests and checking error/integration paths.
 
-Analyzes complexity, duplication, code smells, security vulnerabilities, and performance issues. Generates report with severity levels (Critical/Warning/Info).
+### `/maister-reviews-spec-audit [spec-path | task-path] [--post-implementation]`
+Independent senior-auditor review of a specification for ambiguities and gaps (or spec-vs-code drift with `--post-implementation`).
 
-### `/maister:reviews-pragmatic [path]`
-
-Detects over-engineering and ensures code matches project scale. Identifies excessive abstraction, enterprise patterns in simple code, infrastructure overkill. Recommends specific simplifications with before/after examples.
-
-### `/maister:reviews-reality-check [task-path]`
-
-Validates that completed work actually solves the intended problem. Runs tests, checks end-to-end workflows, and evaluates error scenarios. Returns deployment decision: Ready / Issues Found / Not Ready.
-
-### `/maister:reviews-spec-audit [spec-path]`
-
-Independent specification audit with senior auditor perspective.
-
-| Flag | Description |
-|------|-------------|
-| `--post-implementation` | Compare spec vs actual implementation (default: pre-implementation) |
-
-Identifies ambiguities, missing details, and gaps. Uses external tools (GitHub CLI, Azure CLI) for verification.
-
-### `/maister:reviews-production-readiness [path]`
-
-Pre-deployment verification across 7 dimensions: configuration, monitoring, error handling, performance, security, deployment, and GO/NO-GO recommendation.
-
-| Flag | Description |
-|------|-------------|
-| `--target=prod\|staging` | Target environment (default: `prod` with full rigor) |
+### `/maister-reviews-production-readiness [path] [--target=prod|staging]`
+Pre-deployment verification across configuration, monitoring, error handling, performance, security, and rollback safety, returning a GO / DEPLOY WITH CAUTION / NO-GO verdict.
 
 ---
 
-## Standards
+## Standards & Initialization
 
-### `/maister:init [--standards-from=PATH]`
+### `/maister-init [--standards-from=PATH]`
 
-Initialize the Maister framework. Scans your codebase with a project-analyzer subagent, presents findings for confirmation, then generates:
+Initializes Maister in the workspace:
+- Runs the `project-analyzer` subagent (`model: flash`) to inspect tech stack, architecture, and conventions
+- Generates `.maister/config.yml`, `.maister/docs/INDEX.md`, `.maister/docs/project/`, and `.maister/docs/standards/`
+- Integrates `.maister/docs/INDEX.md` into your workspace `AGENTS.md` (or `GEMINI.md`)
+- Runs `/maister-standards-discover --scope=full` to mine project-specific conventions
 
-- `.maister/docs/` with INDEX.md, project docs (vision, roadmap, tech-stack), and coding standards
-- `.maister/tasks/` directory structure
-- CLAUDE.md integration
+### `/maister-standards-discover [--scope=SCOPE]`
 
-| Flag | Description |
-|------|-------------|
-| `--standards-from=PATH` | Copy standards from another project's `.maister/docs/standards/` instead of built-in defaults. Useful when starting a new project that should follow the same conventions as an existing one. |
-
-If `.maister/` already exists, offers to backup, update, or cancel.
-
-### `/maister:standards-discover [--scope=SCOPE]`
-
-Auto-discovers coding standards from multiple sources in parallel: config files, source code patterns, documentation, pull requests, and CI/CD pipelines.
+Auto-discovers coding standards in parallel across config files, source code patterns, project documentation (`README.md`, `CONTRIBUTING.md`, `AGENTS.md`, `GEMINI.md`, ADRs), pull requests, and CI/CD pipelines.
 
 | Flag | Description |
 |------|-------------|
-| `--scope=full\|quick\|frontend\|backend\|testing\|custom` | Discovery scope (default: `full`) |
-| `--confidence=N` | Minimum confidence threshold, 0-100 (default: `60`) |
-| `--auto-apply` | Auto-apply standards with 90%+ confidence |
-| `--skip-external` | Skip PR and CI/CD analysis |
-| `--pr-count=N` | Number of PRs to analyze (default: `10`, max: `20`) |
+| `--scope=full\|quick\|global\|frontend\|backend\|testing\|<custom>` | Discovery scope (default: `full`) |
+| `--confidence=N` | Minimum confidence score 0–100 (default: `60`) |
+| `--auto-apply` | Auto-apply standards with >= 90% confidence |
+| `--skip-external` | Skip GitHub PR and CI/CD analysis |
+| `--pr-count=N` | Number of recent merged PRs to analyze (default: `20`) |
 
-Presents findings in confidence tiers (high/medium/low) for review before applying.
+### `/maister-standards-update [description] [--from=PATH]`
 
-### `/maister:standards-update [description] [--from=PATH]`
-
-Update or create standards from conversation context or explicit description. When run without arguments, scans your current conversation for standards patterns like "we should always...", "our convention is...", "prefer X over Y" and proposes them as new standards.
-
-| Flag | Description |
-|------|-------------|
-| `--from=PATH` | Sync standards from another project. Analyzes differences, shows what's missing or changed, and lets you select which standards to import. |
+Creates or updates standards in `.maister/docs/standards/` from conversation context, an explicit rule description, or by syncing diffs from another project (`--from=PATH`).
 
 ---
 
 ## Quick Commands
 
-Lightweight commands for small tasks that don't need a full orchestrator workflow.
+Lightweight workflows that operate directly in your codebase without creating `.maister/tasks/` folders:
 
-### `/maister:quick-dev [task description]`
+### `/maister-quick-dev [task description]`
+Implements a clear task directly in the main agent while reading `.maister/docs/INDEX.md` + matched standard files and verifying a pass/fail Standards Compliance Checklist afterward.
 
-Implement a task directly — exactly as the main agent normally would, no planning mode — with standards enforcement. Reads INDEX.md and the specific matched standard files relevant to what you touch, applies them while implementing, and verifies compliance (pass/fail checklist) afterward.
+### `/maister-quick-plan [task description]`
+Explores the codebase read-only, folds matched standards and a `## Standards Compliance Checklist` into a reviewable Antigravity implementation plan artifact (`RequestFeedback: true`), waits for approval, and verifies compliance after implementation.
 
-**When to use**: Task is clear, no architectural decisions needed, you know what needs doing.
-
-### `/maister:quick-plan [task description]`
-
-Works exactly like Claude Code's built-in plan mode, with standards enforcement folded in. While planning, it reads INDEX.md and the specific matched standard files (INDEX.md alone is not enough), and the plan must reference the applicable standards and include a Standards Compliance Checklist (verified after implementation) before exiting plan mode.
-
-### `/maister:quick-bugfix [bug description]`
-
-Lightweight TDD-driven bug fix without a full orchestrator workflow. Analyzes the bug, writes a failing test, implements the fix, and verifies the test passes.
-
-**When to use**: Simple, isolated bugs where you can quickly identify the root cause. If the bug is too complex (multiple files, unclear root cause, architectural impact), the skill suggests escalating to `/maister:development`.
-
-No task directory created — works directly in your codebase.
+### `/maister-quick-bugfix [bug description]`
+Lightweight TDD bug fix: root-cause analysis → complexity escalation check → approved fix plan → failing test (Red gate) → fix + regression check (Green gate) → Standards Compliance Checklist verification.

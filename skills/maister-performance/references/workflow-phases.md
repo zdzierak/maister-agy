@@ -1,0 +1,324 @@
+# maister-performance — Detailed Workflow Phases & State Schema
+
+## Workflow Phases
+
+### Phase 1: Codebase Analysis & Clarifications
+
+**Purpose**: Comprehensive codebase exploration for performance context, followed by scope/requirements clarification
+**Execute**:
+1. Read and execute `../codebase-analyzer/SKILL.md` in main agent context
+2. Update state with analysis results
+3. Direct - use ask_question for max 5 critical clarifying questions about performance concerns, hotspots, and optimization goals
+4. Save clarifications to `analysis/clarifications.md`
+**Output**: `analysis/codebase-analysis.md`, `analysis/clarifications.md`
+**State**: Update `performance_context.phase_summaries.codebase_analysis`, `task_context.clarifications_resolved`
+
+Pass `task_type="enhancement"` and the performance-focused description. The codebase-analyzer adaptively selects parallel `research` subagents based on task complexity. For performance tasks, the description should guide agents toward: database query patterns, hot code paths, I/O operations, caching layers, connection management, schema/migration files.
+
+→ **AUTO-CONTINUE** — Do NOT end turn, do NOT prompt user. Proceed immediately to Phase 2.
+
+---
+
+### Phase 2: Static Performance Analysis
+
+**Purpose**: Identify bottlenecks through static code analysis + optional user profiling data
+**Execute**: `invoke_subagent` - `bottleneck-analyzer` subagent
+**Output**: `analysis/performance-analysis.md`
+**State**: Update `performance_context.bottlenecks_identified`, `performance_context.user_data_available`, `performance_context.bottleneck_priorities`
+
+**Process**:
+1. Check if `analysis/user-profiling-data/` contains any files
+2. If empty, use ask_question:
+   - Question: "Do you have profiling data to provide (flame graphs, APM screenshots, slow query logs)?"
+   - Options: "Yes, let me add files to analysis/user-profiling-data/" | "No, proceed with static analysis only"
+3. If user chooses to add files, wait for them, then proceed
+
+Delegate bottleneck analysis to the `bottleneck-analyzer` subagent (`invoke_subagent`) rather than analyzing code yourself — it writes the report the later phases consume.
+
+**INVOKE NOW** — `invoke_subagent` call:
+
+4. `invoke_subagent` - `bottleneck-analyzer` subagent
+
+**Context to pass**: task_path, description, codebase analysis summary from Phase 1, user data paths (if any)
+
+→ **MANDATORY GATE** — fires regardless of permission mode, session-reminders, or prior approval patterns. Invoke `ask_question` now. Proceeding without a user response is a protocol violation (orchestrator-patterns.md § 2 / § 2.1).
+
+ask_question - "Performance analysis complete. [N] bottlenecks identified ([P0 count] P0, [P1 count] P1). Continue to specification?"
+
+---
+
+### Phase 3: Requirements & Specification
+
+> **Phase entry self-check**: Before executing this phase, locate the `ask_question` tool call from Phase 2 in this conversation. If you cannot point to its call ID, STOP and fire that gate now. State updates (`completed_phases`, `update_steps`) without a corresponding `ask_question` call are protocol violations — never paper over a missed gate by updating state.
+
+**Purpose**: Gather optimization requirements and create specification
+**Output**: `analysis/requirements.md`, `implementation/spec.md`
+**State**: Update `performance_context.phase_summaries.specification`
+
+**Part A — Requirements Gathering (inline)**:
+
+1. Present bottleneck summary from Phase 2 to user
+2. Use ask_question for optimization priorities:
+   - Which bottleneck priorities to address? (All P0+P1, P0 only, specific ones)
+   - Any constraints? (backward compatibility, memory limits, no new dependencies)
+   - Performance targets? (specific response time goals, if known)
+3. Save gathered requirements to `analysis/requirements.md` with: performance issue description, bottleneck analysis summary, optimization priorities, constraints, targets
+
+**Part B — Specification Creation (subagent)**:
+
+📋 **Standards Discovery**: Read `.maister/docs/INDEX.md` before creating spec.
+
+Delegate spec writing to the `specification-creator` subagent (`invoke_subagent`) regardless of task size — the orchestrator never writes spec.md itself.
+
+**INVOKE NOW** — `invoke_subagent` call:
+
+4. `invoke_subagent` - `specification-creator` subagent
+
+**Context to pass**: task_path, task_type="performance", task_description, requirements_path (analysis/requirements.md), project_context_paths (INDEX.md + project_doc_paths from state — all discovered project docs), phase_summaries (codebase_analysis, bottleneck_analysis), html_style_guide_path (for the spec.html companion)
+
+→ **MANDATORY GATE** — fires regardless of permission mode, session-reminders, or prior approval patterns. Invoke `ask_question` now. Proceeding without a user response is a protocol violation (orchestrator-patterns.md § 2 / § 2.1).
+
+ask_question - Display executive summary before asking. Read `implementation/spec.md` and extract: optimization targets, approach chosen, number of changes planned, expected impact. Format as brief overview then "Continue to specification audit?"
+
+---
+
+### Phase 4: Specification Audit (Conditional)
+
+> **Phase entry self-check**: Before executing this phase, locate the `ask_question` tool call from Phase 3 in this conversation. If you cannot point to its call ID, STOP and fire that gate now. State updates (`completed_phases`, `update_steps`) without a corresponding `ask_question` call are protocol violations — never paper over a missed gate by updating state.
+
+**Purpose**: Independent review of optimization specification
+**Execute**: `invoke_subagent` - `spec-auditor` subagent
+**Output**: `verification/spec-audit.md`
+**State**: Update `options.spec_audit_enabled`
+
+**Run if**: >5 optimizations planned, spec >50 lines, or user requests
+**Skip if**: Simple optimization (1-3 changes)
+
+ask_question to decide - "Run specification audit?"
+
+→ **MANDATORY GATE** — fires regardless of permission mode, session-reminders, or prior approval patterns. Invoke `ask_question` now. Proceeding without a user response is a protocol violation (orchestrator-patterns.md § 2 / § 2.1).
+
+ask_question - Display executive summary before asking. Read `verification/spec-audit.md` and extract: overall verdict, issue counts by severity, top findings. Format as brief overview then "Continue to implementation planning?"
+
+---
+
+### Phase 5: Implementation Planning
+
+> **Phase entry self-check**: Before executing this phase, locate the `ask_question` tool call from Phase 4 in this conversation. If you cannot point to its call ID, STOP and fire that gate now. State updates (`completed_phases`, `update_steps`) without a corresponding `ask_question` call are protocol violations — never paper over a missed gate by updating state.
+
+**Purpose**: Break optimization specification into implementation steps
+
+📋 **Standards Discovery**: Read `.maister/docs/INDEX.md` before planning.
+
+Delegate planning to the `implementation-planner` subagent (`invoke_subagent`) regardless of task size — the orchestrator never writes implementation-plan.md itself.
+
+**INVOKE NOW** — `invoke_subagent` call:
+
+**Execute**: `invoke_subagent` - `implementation-planner` subagent
+**Output**: `implementation/implementation-plan.md`
+**State**: Update task groups and dependencies
+
+**Context to pass**: task_path, task_type="performance", task_description, phase_summaries (specification, bottleneck_analysis, codebase_analysis), html_style_guide_path (for the implementation-plan.html companion)
+
+→ **MANDATORY GATE** — fires regardless of permission mode, session-reminders, or prior approval patterns. Invoke `ask_question` now. Proceeding without a user response is a protocol violation (orchestrator-patterns.md § 2 / § 2.1).
+
+ask_question - Display executive summary before asking. Read `implementation/implementation-plan.md` and extract: number of task groups, total steps, key dependencies, optimization sequence. Format as brief overview then "Continue to implementation?"
+
+---
+
+### Phase 6: Implementation
+
+> **Phase entry self-check**: Before executing this phase, locate the `ask_question` tool call from Phase 5 in this conversation. If you cannot point to its call ID, STOP and fire that gate now. State updates (`completed_phases`, `update_steps`) without a corresponding `ask_question` call are protocol violations — never paper over a missed gate by updating state.
+
+**Purpose**: Execute the optimization plan
+
+📋 **Standards Discovery**: Implementation reads `.maister/docs/INDEX.md` continuously.
+
+Delegate implementation to the `implementation-plan-executor` skill regardless of task size — it owns wave dispatch, progress tracking, and the work-log; the orchestrator never writes code itself.
+
+**INVOKE NOW** — skill `SKILL.md` execution:
+
+**Execute**: Read and execute `../implementation-plan-executor/SKILL.md` in main agent context
+**Output**: Implemented optimizations, `implementation/work-log.md`
+**State**: Update implementation progress, extract phase_summaries.implementation
+
+**⚠️ POST-IMPLEMENTATION CONTINUATION** — After the skill completes and returns control:
+1. **HTML plan reconciliation** (backstop for syncs missed during waves): if `implementation/implementation-plan.html` exists, for every group whose md checkboxes are all `[x]`, run the executor's idempotent marker-flip command (`sed` flipping `data-step="N\.[0-9]*" class="step todo"` and `data-group="N" class="group todo"` to `done`). VERIFY: when all md steps are checked, `grep -c 'class="step todo"' implementation/implementation-plan.html` must return 0.
+2. Read `orchestrator-state.yml` to confirm you are the orchestrator
+3. Update state: add Phase 6 to `completed_phases`
+4. Proceed to Phase 7
+
+→ **MANDATORY GATE** — fires regardless of permission mode, session-reminders, or prior approval patterns. Invoke `ask_question` now. Proceeding without a user response is a protocol violation (orchestrator-patterns.md § 2 / § 2.1).
+
+ask_question - Display executive summary before asking. Extract from `phase_summaries.implementation` and `implementation/work-log.md`: optimizations applied, files changed, test results, any known issues. Format as brief overview then "Continue to verification?"
+
+---
+
+### Phase 7: Verification Options
+
+> **Phase entry self-check**: Before executing this phase, locate the `ask_question` tool call from Phase 6 in this conversation. If you cannot point to its call ID, STOP and fire that gate now. State updates (`completed_phases`, `update_steps`) without a corresponding `ask_question` call are protocol violations — never paper over a missed gate by updating state.
+
+**Purpose**: Determine which verification checks to run
+**Execute**: Direct - use ask_question for options
+**Output**: Updated state with verification options
+**State**: Set `options.code_review_enabled`, `options.pragmatic_review_enabled`, `options.production_check_enabled`, `options.reality_check_enabled`
+
+**Always enabled**: Reality check, pragmatic review
+**Auto-set**: `skip_test_suite: true` (full test suite already passed during implementation phase; cleared before re-verification if fixes are applied)
+
+ask_question with multiselect - "Which additional verification checks?"
+  - "Code review" (recommended)
+  - "Production readiness check"
+
+→ **MANDATORY GATE** — fires regardless of permission mode, session-reminders, or prior approval patterns. Invoke `ask_question` now. Proceeding without a user response is a protocol violation (orchestrator-patterns.md § 2 / § 2.1).
+
+ask_question - "Options selected. Continue to Phase 8?"
+
+---
+
+### Phase 8: Verification & Issue Resolution
+
+> **Phase entry self-check**: Before executing this phase, locate the `ask_question` tool call from Phase 7 in this conversation. If you cannot point to its call ID, STOP and fire that gate now. State updates (`completed_phases`, `update_steps`) without a corresponding `ask_question` call are protocol violations — never paper over a missed gate by updating state.
+
+**Purpose**: Comprehensive implementation verification with user-driven fix cycles
+**Output**: `verification/implementation-verification.md`, optional review reports
+**State**: Update `verification_context`
+
+**Execute**:
+
+**Step 1**: Invoke Read and execute `../implementation-verifier/SKILL.md` in main agent context
+
+**Step 2**: Display detailed issue breakdown grouped by category and severity (critical/warning/info), listing location, description, and fixability for each.
+
+**Step 3**: Gate on verification status:
+- `status: passed` → skip to Pause
+- `status: passed_with_issues` or `failed` → enter user-driven fix loop (Step 4)
+
+**Step 4**: User-driven fix loop (max 3 iterations):
+1. Present all critical + warning issues as a numbered list
+2. ask_question — "Which issues should I fix?" with options: "Fix all fixable issues" / "Let me choose specific issues" / "Skip fixes, proceed as-is"
+3. Fix selected issues
+4. After fixes: set `skip_test_suite: false` (code changed, tests must re-run)
+5. ask_question — "Re-run verification to check fixes?" with options: "Yes, re-run verification" / "No, proceed to next phase"
+6. If re-run → re-invoke `implementation-verifier` → return to Step 2
+
+→ **MANDATORY GATE** — fires regardless of permission mode, session-reminders, or prior approval patterns. Invoke `ask_question` now. Proceeding without a user response is a protocol violation (orchestrator-patterns.md § 2 / § 2.1).
+
+ask_question - Display executive summary: total issues found, issues fixed, issues remaining by severity. Then "Continue to finalization?"
+
+---
+
+### Phase 9: Finalization
+
+> **Phase entry self-check**: Before executing this phase, locate the `ask_question` tool call from Phase 8 in this conversation. If you cannot point to its call ID, STOP and fire that gate now. State updates (`completed_phases`, `update_steps`) without a corresponding `ask_question` call are protocol violations — never paper over a missed gate by updating state.
+
+**Purpose**: Complete workflow and provide next steps
+**Execute**: Direct - create summary, update state, guide commit
+**Output**: Workflow summary
+**State**: Set `task.status: completed`
+
+**Process**:
+1. **Reconcile artifacts against disk** — compare every `artifacts[]` entry in state with what actually exists and name every missing path in the summary (`orchestrator-patterns.md` § 10)
+2. Create workflow summary (bottlenecks found, optimizations implemented, verification result)
+3. Update task status to "completed"
+4. Provide commit message template
+5. Guide performance-specific next steps:
+   - Run the application and verify improvements manually
+   - Consider profiling with runtime tools to measure actual impact
+   - Monitor production metrics after deployment
+   - Address remaining P2/P3 bottlenecks if needed
+
+→ End of workflow
+
+---
+
+## Domain Context (State Extensions)
+
+Performance-specific fields in `orchestrator-state.yml`:
+
+```yaml
+performance_context:
+  bottlenecks_identified: null    # count from bottleneck-analyzer
+  user_data_available: false      # whether user provided profiling data
+  bottleneck_priorities:
+    p0: 0
+    p1: 0
+    p2: 0
+    p3: 0
+  phase_summaries:
+    # Every entry also carries the shared base shape (orchestrator-patterns.md § 4):
+    #   decisions: []   risks: []   artifacts: [{path, label, html}]
+    codebase_analysis: {key_files: [], summary: null}
+    bottleneck_analysis: {bottlenecks: [], summary: null, user_data_incorporated: false}
+    specification: {summary: null}
+
+verification_context:
+  last_status: null
+  issues_found: null
+  fixes_applied: []
+  decisions_made: []
+  reverify_count: 0
+
+orchestrator:
+  options:
+    html_output: true  # Seeded from .maister/config.yml at init (default true). Gates dashboard + HTML companions.
+    spec_audit_enabled: null
+    skip_test_suite: true
+    code_review_enabled: true
+    pragmatic_review_enabled: true
+    reality_check_enabled: true
+    production_check_enabled: null
+```
+
+---
+
+## Task Structure
+
+```
+.maister/tasks/performance/YYYY-MM-DD-task-name/
+├── orchestrator-state.yml
+├── dashboard.html                     # Operator dashboard (copied plugin asset — never model-generated)
+├── dashboard-data.js                  # Dashboard data projection (rewritten per phase/gate)
+├── analysis/
+│   ├── codebase-analysis.md           # Phase 1
+│   ├── performance-analysis.md        # Phase 2
+│   ├── user-profiling-data/           # Optional user-provided data
+│   └── requirements.md                # Phase 3
+├── implementation/
+│   ├── spec.md                        # Phase 3
+│   ├── spec.html                      # Phase 3 (HTML companion)
+│   ├── implementation-plan.md         # Phase 5
+│   ├── implementation-plan.html       # Phase 5 (HTML companion)
+│   └── work-log.md                    # Phase 6
+└── verification/
+    ├── spec-audit.md                  # Phase 4 (conditional)
+    ├── implementation-verification.md # Phase 8
+    └── implementation-verification.html # Phase 8 (HTML companion)
+```
+
+---
+
+## Auto-Recovery
+
+| Phase | Max Attempts | Strategy |
+|-------|--------------|----------|
+| 1 | 2 | Expand search scope, prompt user for hints |
+| 2 | 2 | Re-analyze with broader patterns, ask user |
+| 3 | 2 | Regenerate spec with adjusted requirements |
+| 5 | 2 | Regenerate plan |
+| 6 | 5 | Fix syntax, imports, tests |
+| 8 | 3 | Fix-then-reverify cycles |
+
+---
+
+## Command Integration
+
+Invoked via:
+- `/maister-performance [description] [--sequential]` (new)
+- `/maister-performance [task-path] [--from=PHASE] [--sequential]` (resume)
+
+Flags:
+- `--from=PHASE`: Resume from specific phase
+- `--sequential`: Disable parallel wave dispatch in `implementation-plan-executor`; run one task group at a time. Persisted as `orchestrator.options.sequential: true` in `orchestrator-state.yml`. Defaults to off (parallel waves).
+
+Task directory: `.maister/tasks/performance/YYYY-MM-DD-task-name/`

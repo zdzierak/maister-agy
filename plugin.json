@@ -1,0 +1,29 @@
+{
+  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
+  "name": "maister",
+  "displayName": "Maister",
+  "version": "2.2.6",
+  "description": "Structured, standards-aware software development workflows from specification and planning to test-driven implementation and verification.",
+  "logo": "assets/logo.svg",
+  "suggestedPrompts": [
+    "Initialize Maister and auto-discover coding standards for this project (/maister-init)",
+    "Classify a task and start the right structured SDLC workflow (/maister-work)",
+    "Run a code quality, security, and performance audit (/maister-reviews-code)"
+  ],
+  "author": {
+    "name": "Piotr Zdzierak (fork of SkillPanel/maister)",
+    "url": "https://github.com/zdzierak/maister-agy"
+  },
+  "homepage": "https://github.com/zdzierak/maister-agy",
+  "repository": "https://github.com/zdzierak/maister-agy",
+  "license": "MIT",
+  "keywords": [
+    "sdlc",
+    "workflows",
+    "standards",
+    "tdd",
+    "specification",
+    "code-review",
+    "product-design"
+  ]
+}

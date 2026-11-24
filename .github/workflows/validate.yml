@@ -1,0 +1,14 @@
+name: Validate Antigravity Plugin
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate plugin manifests, skills, agents, rules, and hooks
+        run: make validate

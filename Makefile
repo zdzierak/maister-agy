@@ -1,33 +1,40 @@
-.PHONY: build validate clean watch
-
-build:
-	bash platforms/copilot-cli/build.sh
+.PHONY: validate install uninstall
 
 validate:
-	@echo "Checking no colons in command names..."
-	@! grep -r '^name:.*:' plugins/maister-copilot/commands/ 2>/dev/null || (echo "FAIL: colons in command names" && exit 1)
-	@echo "Checking no multi-select references..."
-	@! grep -ri 'multi.select\|multiSelect' plugins/maister-copilot/skills/ 2>/dev/null || (echo "FAIL: multi-select found in skills" && exit 1)
-	@echo "Checking commands are flat (no subdirectories)..."
-	@test $$(find plugins/maister-copilot/commands -mindepth 2 -name "*.md" 2>/dev/null | wc -l) -eq 0 || (echo "FAIL: nested command directories found" && exit 1)
-	@echo "Checking no CLAUDE.md references in skills..."
-	@! grep -ri 'CLAUDE\.md' plugins/maister-copilot/skills/ 2>/dev/null || (echo "FAIL: CLAUDE.md references found in skills" && exit 1)
-	@echo "Checking no maister- prefix in copilot command names..."
-	@! grep -r '^name: maister-' plugins/maister-copilot/commands/ 2>/dev/null || (echo "FAIL: maister- prefix in command names" && exit 1)
-	@echo "Checking no maister: prefixes in copilot variant..."
-	@! grep -r 'maister:' plugins/maister-copilot/ --include="*.md" --include="*.json" --include="*.mjs" --include="*.yml" 2>/dev/null || (echo "FAIL: maister: prefix found" && exit 1)
+	@if command -v agy >/dev/null 2>&1; then \
+		echo "Running strict Antigravity plugin validation..."; \
+		agy plugin validate --strict .; \
+	else \
+		echo "agy CLI not found in PATH — skipping agy plugin validate (running offline checks)"; \
+	fi
+	@echo "Checking JSON manifests parse cleanly..."
+	@python3 -m json.tool plugin.json >/dev/null
+	@python3 -m json.tool mcp_config.json >/dev/null
+	@python3 -m json.tool hooks.json >/dev/null
+	@echo "Checking every SKILL.md is under the 24,000-byte Antigravity inline limit..."
+	@for f in skills/*/SKILL.md; do \
+		bytes=$$(wc -c < "$$f" | tr -d ' '); \
+		if [ "$$bytes" -ge 24000 ]; then \
+			echo "FAIL: $$f is $$bytes bytes (must be < 24000)"; exit 1; \
+		fi; \
+	done
+	@echo "Checking rules/AGENTS.md is under the 24,000-byte rule limit..."
+	@bytes=$$(wc -c < rules/AGENTS.md | tr -d ' '); \
+	if [ "$$bytes" -ge 24000 ]; then \
+		echo "FAIL: rules/AGENTS.md is $$bytes bytes (must be < 24000)"; exit 1; \
+	fi
+	@echo "Checking no legacy Claude-only tool or prefix identifiers remain in runtime files..."
+	@! grep -rnE 'CLAUDE_PLUGIN_ROOT|CLAUDE_PROJECT_DIR|EnterPlanMode|ExitPlanMode|AskUserQuestion|TaskCreate|TaskUpdate|TaskList|addBlockedBy|maister:' skills/ agents/ rules/ scripts/ hooks.json plugin.json mcp_config.json 2>/dev/null || (echo "FAIL: legacy Claude-only identifier found" && exit 1)
+	@echo "Checking every hooks.json command script exists and is executable..."
+	@for rel in $$(grep -o 'scripts/[A-Za-z0-9_.-]*\.sh' hooks.json | sort -u); do \
+		test -x "$$rel" || { echo "FAIL: hooks.json script $$rel is missing or not executable"; exit 1; }; \
+	done
 	@echo "Checking gate markers are not nested inside code spans..."
-	@! grep -rnF '`→ **MANDATORY GATE** — fires ' plugins/maister/skills/ 2>/dev/null || (echo "FAIL: gate marker nested inside a code span" && exit 1)
-	@! grep -nF '→ Pause' plugins/maister/skills/orchestrator-framework/references/orchestrator-creation-checklist.md 2>/dev/null || (echo "FAIL: superseded transition marker in the orchestrator checklist" && exit 1)
-	@echo "Checking the plugin-root variable is renamed for the Copilot variant..."
-	@! grep -rn 'CLAUDE_PLUGIN_ROOT' plugins/maister-copilot/skills/ --include="*.md" 2>/dev/null || (echo "FAIL: a Claude-only plugin-root variable survives in the emitted skills" && exit 1)
-	@test "$$(grep -rl 'MAISTER_PLUGIN_ROOT' plugins/maister-copilot/skills/ --include="*.md" 2>/dev/null | wc -l | tr -d ' ')" = "$$(grep -rl 'CLAUDE_PLUGIN_ROOT' plugins/maister/skills/ --include="*.md" 2>/dev/null | wc -l | tr -d ' ')" || (echo "FAIL: the emitted skills' plugin-root variable count drifted from the source tree" && exit 1)
-	@echo "Checking every hooks.json command path exists on disk..."
-	@for rel in $$(grep -o 'hooks/[A-Za-z0-9_.-]*\.\(sh\|mjs\)' plugins/maister/hooks/hooks.json | sort -u); do test -f "plugins/maister/$$rel" || { echo "FAIL: hooks.json names plugins/maister/$$rel, which does not exist"; exit 1; }; done
-	@echo "All checks passed"
+	@! grep -rnF '`→ **MANDATORY GATE** — fires ' skills/ 2>/dev/null || (echo "FAIL: gate marker nested inside a code span" && exit 1)
+	@echo "All checks passed!"
 
-clean:
-	rm -rf plugins/maister-copilot/
+install:
+	agy plugin install .
 
-watch:
-	fswatch -o plugins/maister/ | xargs -n1 -I{} make build
+uninstall:
+	agy plugin uninstall maister

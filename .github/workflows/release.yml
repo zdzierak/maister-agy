@@ -11,8 +11,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Build and validate
-        run: make build && make validate
+      - name: Validate plugin
+        run: make validate
 
       # Tags from a maintenance line can be pushed after a newer major exists.
       # Only the highest stable version becomes the latest release, and release

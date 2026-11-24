@@ -1,258 +1,181 @@
 # Workflow Details
 
-Maister provides five workflow types, each with phases tailored to its needs. All workflows pause between phases for your review and input.
+> Adapted for Google Antigravity (`agy`) from [SkillPanel/maister](https://github.com/SkillPanel/maister) (originally created for Claude Code).
 
-## Development Workflow
+Maister provides five structured orchestrator workflows. Every orchestrator persists its state in `orchestrator-state.yml`, mirrors live progress via `update_steps` and a self-contained browser dashboard (`dashboard.html`), and pauses at `→ MANDATORY GATE` checkpoints using Antigravity's `ask_question` UI.
 
-The unified development workflow handles features, enhancements, and bug fixes through a 14-phase adaptive pipeline. Phases activate or skip based on task type.
+---
 
+## Development Workflow (`/maister-development`)
+
+Handles features, enhancements, bug fixes, and refactoring through a 14-phase adaptive pipeline. Phases activate or skip based on task characteristics detected during Gap Analysis rather than rigid upfront labels.
+
+```text
+/maister-development
+/maister-development "Add two-factor authentication"
+/maister-development "Fix login timeout" --type=bug
 ```
-/maister:development
-/maister:development "Add two-factor authentication"
-/maister:development "Fix login timeout" --type=bug
-```
 
-When run without arguments, the plugin extracts the task description from your conversation and auto-detects the type (feature, bug, or enhancement). Use `--type=` only when you want to override the auto-detection.
-
-**Flags**: `--type=bug|enhancement|feature`, `--e2e`, `--user-docs`, `--code-review`, `--research=PATH`, `--from=PHASE`
+**Flags**: `--type=bug|enhancement|feature`, `--e2e`/`--no-e2e`, `--user-docs`/`--no-user-docs`, `--audit`/`--no-audit`, `--research=PATH`, `--sequential`, `--from=PHASE`, `--reset-attempts`
 
 ### Phases
 
 | # | Phase | Applies To |
 |---|-------|-----------|
-| 1 | Codebase analysis + clarifications | All |
-| 2 | Gap analysis with decision gates | All |
-| 3 | TDD Red gate (write failing test first) | Bug fixes only |
-| 4 | UI mockups (ASCII) | Features & enhancements (UI-heavy) |
-| 5 | Requirements + specification | All |
-| 6 | Specification audit | All (recommended) |
-| 7 | Implementation planning | All |
-| 8 | Implementation execution | All |
-| 9 | TDD Green gate (verify test passes) | Bug fixes only |
+| 1 | Codebase analysis (`codebase-analyzer`) + clarifications | All |
+| 2 | Gap analysis (`gap-analyzer`) + scope decision gates | All |
+| 3 | TDD Red gate (write failing reproduction test) | When `has_reproducible_defect` |
+| 4 | UI mockups (`maister-mockup-studio`: HTML or ASCII) | When `ui_heavy` |
+| 5 | Technical approach, requirements & specification (`specification-creator`) | All |
+| 6 | Specification audit (`spec-auditor`) | Recommended (skippable) |
+| 7 | Implementation planning (`implementation-planner`) | All |
+| 8 | Wave-based implementation (`implementation-plan-executor` + parallel `task-group-implementer` subagents) | All |
+| 9 | TDD Green gate (verify reproduction test passes) | When Phase 3 ran |
 | 10 | Verification options selection | All |
-| 11 | Verification + issue resolution | All |
-| 12 | E2E testing | Optional (`--e2e`) |
-| 13 | User documentation | Optional (`--user-docs`) |
-| 14 | Finalization | All |
+| 11 | Verification (`implementation-verifier`) + fix-and-reverify loop | All |
+| 12 | Runtime browser E2E verification (`e2e-test-verifier` via Playwright MCP) | Optional (`--e2e` / `ui_heavy`) |
+| 13 | End-user documentation with screenshots (`user-docs-generator`) | Optional (`--user-docs`) |
+| 14 | Artifact reconciliation & finalization | All |
 
-### Research-Based Development
+### Chaining Research or Product Design into Development
 
-Start development informed by a completed research workflow. Research context flows through all phases:
-
-```
-/maister:development "Implement OAuth" --research=.maister/tasks/research/2026-01-12-oauth-research
-```
-
-Research artifacts are copied to `analysis/research-context/` and summaries pass to every subagent.
-
-### Resume
-
-```
-/maister:development [task-path] [--from=PHASE] [--reset-attempts]
+```text
+/maister-development .maister/tasks/research/2026-11-24-oauth-research
+/maister-development .maister/tasks/product-design/2026-11-24-api-dashboard
 ```
 
-Resume phases: `analysis`, `gap`, `spec`, `plan`, `implement`, `verify`
+Research findings (`analysis/research-context/`) and product-design briefs/mockups (`analysis/design-context/`) flow into every downstream phase as binding context without skipping analysis, specification, or verification.
 
 ---
 
-## Performance Optimization
+## Performance Optimization (`/maister-performance`)
 
-Static code analysis to detect bottlenecks, followed by standard spec/plan/implement/verify pipeline.
+Static code analysis to identify bottlenecks, followed by the specification, planning, parallel wave implementation, and verification pipeline.
 
-```
-/maister:performance
-/maister:performance "Optimize dashboard loading time"
+```text
+/maister-performance
+/maister-performance "Optimize dashboard loading time"
 ```
 
 ### Phases
 
 | # | Phase |
 |---|-------|
-| 1 | Codebase analysis + clarifications |
-| 2 | Static performance analysis (N+1 queries, missing indexes, O(n^2) algorithms, blocking I/O, memory leaks) |
-| 3 | Requirements + specification |
-| 4 | Specification audit (conditional) |
-| 5 | Implementation planning |
-| 6 | Implementation execution |
+| 1 | Codebase analysis + performance clarifications |
+| 2 | Static bottleneck analysis (`bottleneck-analyzer`: N+1 queries, missing indexes, O(n²), blocking I/O, memory leaks) + optional profiling data in `analysis/user-profiling-data/` |
+| 3 | Optimization requirements + specification (`specification-creator`) |
+| 4 | Specification audit (`spec-auditor`, conditional) |
+| 5 | Implementation planning (`implementation-planner`) |
+| 6 | Implementation execution (`implementation-plan-executor`) |
 | 7 | Verification options |
-| 8 | Verification + issue resolution |
-| 9 | Finalization |
-
-**Optional profiling data**: You can provide runtime profiling data, flame graphs, or APM screenshots. The workflow creates `analysis/user-profiling-data/` for these files.
-
-### Resume
-
-```
-/maister:performance [task-path] [--from=PHASE] [--reset-attempts]
-```
-
-Resume phases: `analysis`, `specification`, `planning`, `implementation`, `verification`
+| 8 | Verification + issue resolution (`implementation-verifier`) |
+| 9 | Finalization & runtime profiling guidance |
 
 ---
 
-## Migration
+## Migration (`/maister-migration`)
 
-Technology, data, and architecture migrations with rollback planning and risk assessment.
+Technology, data, and architecture migrations with mandatory rollback planning, compatibility testing, and data-integrity halt guards.
 
+```text
+/maister-migration
+/maister-migration "Migrate from REST to GraphQL" --type=architecture
 ```
-/maister:migration
-/maister:migration "Migrate from REST to GraphQL" --type=code
-```
-
-**Migration types**: `code`, `data`, `architecture`, `general`
 
 ### Phases
 
 | # | Phase |
 |---|-------|
-| 1 | Current state analysis |
-| 2 | Target state planning + gap identification |
-| 3 | Migration requirements + strategy specification (includes rollback plan) |
-| 4 | Implementation planning |
-| 5 | Migration execution |
-| 6 | Verification + compatibility testing |
-| 7 | Issue resolution (conditional, halts on data integrity issues) |
-| 8 | Documentation (optional) |
-
-**Key behaviors**:
-- Rollback planning is mandatory
-- Dual-run support for zero-downtime migrations
-- Halts on data integrity issues (no automatic recovery)
-- External research for version upgrades via web search
-
-### Resume
-
-```
-/maister:migration [task-path] [--from=PHASE] [--reset-attempts]
-```
-
-Resume phases: `analysis`, `target`, `spec`, `plan`, `execute`, `verify`, `docs`
+| 1 | Current state analysis (`codebase-analyzer`) + clarifications |
+| 2 | Target state planning + gap analysis (`gap-analyzer`) |
+| 3 | Migration requirements + strategy specification (`specification-creator`, includes `rollback-plan.md`) |
+| 4 | Implementation planning (`implementation-planner`) |
+| 5 | Migration execution (`implementation-plan-executor`) |
+| 6 | Compatibility & rollback verification (`implementation-verifier`) |
+| 7 | Issue resolution (conditional; halts immediately on data-integrity issues) |
+| 8 | Migration guide documentation (`user-docs-generator`, optional `--user-docs`) |
 
 ---
 
-## Research
+## Research (`/maister-research`)
 
-Multi-source research with synthesis, optional solution brainstorming, and high-level design.
+Evidence-based multi-source research with parallel `information-gatherer` subagents, pattern synthesis, optional solution brainstorming, and C4/MADR architecture design.
 
+```text
+/maister-research
+/maister-research "What authentication approach fits our architecture?" --type=technical
 ```
-/maister:research
-/maister:research "What authentication approach fits our architecture?" --type=technical
-```
-
-**Research types**: `technical`, `requirements`, `literature`, `mixed`
-
-**Flags**: `--brainstorm` (force brainstorming phases), `--no-brainstorm` (skip them)
 
 ### Phases
 
 | # | Phase |
 |---|-------|
-| 1 | Research foundation: initialize → plan methodology → gather information (parallel) → synthesize findings |
-| 2 | Brainstorming decision (evaluate value) |
-| 3 | Solution brainstorming (HMW questions, evidence-driven) |
-| 4 | High-level design (C4 diagrams + ADR documentation) |
-| 5 | Review outputs |
-| 6 | Verification (optional) |
-| 7 | Integration (optional) |
-| 8 | Spawn development workflow (optional) |
-
-Information gathering runs parallel subagents across multiple source categories (codebase, docs, config, external).
-
-### Resume
-
-```
-/maister:research [task-path] [--from=PHASE] [--reset-attempts]
-```
-
-Resume phases: `foundation`, `brainstorming-decision`, `brainstorming`, `design`, `outputs`, `verification`, `integration`
+| 1 | Research foundation: initialize brief → `research-planner` → parallel `information-gatherer` subagents → `research-synthesizer` (`outputs/research-report.md`) |
+| 2 | Evaluate brainstorming & architecture design value |
+| 3 | Unbiased solution alternatives generation (`solution-brainstormer`) |
+| 4 | Sequential interactive convergence across decision areas |
+| 5 | High-level C4 architecture & MADR decision log (`solution-designer`) |
+| 6 | Artifact reconciliation, summary & handoff to `/maister-development` |
 
 ---
 
-## Product Design
+## Product Design (`/maister-product-design`)
 
-Interactive workflow for designing features and products before building them. Transforms ideas into structured product briefs through collaborative exploration, iterative refinement, and visual prototyping. Phases adapt based on design characteristics (greenfield vs enhancement, simple vs complex, UI-focused vs backend).
+Interactive workflow for designing features and products before writing code, alternating between exploratory questioning and propose-and-refine convergence.
 
+```text
+/maister-product-design
+/maister-product-design "Design a dashboard for monitoring API usage"
 ```
-/maister:product-design
-/maister:product-design "Design a dashboard for monitoring API usage"
-/maister:product-design --research=.maister/tasks/research/2026-01-12-auth-research
-```
-
-When run without arguments, the plugin extracts the design brief from your conversation.
-
-**Flags**: `--research=PATH`, `--no-visual`, `--from=PHASE`
 
 ### Phases
 
 | # | Phase | Activation |
 |---|-------|------------|
-| 0 | Initialize, gather context & detect characteristics | Always |
-| 1 | Context synthesis (codebase analysis or mini-research) | Always (scope adapts) |
-| 2 | Problem space exploration (interactive, iterative) | Always (depth adapts) |
+| 0 | Initialize, gather context & detect design characteristics | Always |
+| 1 | Unified context synthesis (`codebase-analyzer` + `information-gatherer`) | Always |
+| 2 | Problem space exploration & iterative problem statement | Always |
 | 3 | User & persona exploration | Greenfield or complex designs |
-| 4 | Design alternatives generation (agent-driven, unbiased) | Always |
-| 5 | Converge on design direction (interactive) | Always |
-| 6 | Feature specification, section-by-section (interactive) | Always (depth adapts) |
-| 7 | Visual prototyping (browser-based companion with ASCII fallback) | UI-focused designs |
-| 8 | Review & hand off product brief | Always |
-
-Phases 2, 5, and 6 include iterative refinement loops — you can request revisions before moving on. Phase 4 uses an agent to generate alternatives without anchoring bias.
-
-The output is a structured product brief that can be passed directly to the development workflow:
-
-```
-/maister:development .maister/tasks/product-design/2026-03-10-api-dashboard
-```
-
-### Resume
-
-```
-/maister:product-design [task-path] [--from=PHASE] [--reset-attempts]
-```
-
-Resume phases: `context`, `synthesis`, `problem`, `personas`, `alternatives`, `convergence`, `specification`, `prototyping`, `handoff`
+| 4 | Unbiased design alternatives generation (`solution-brainstormer`) | Always |
+| 5 | Interactive direction convergence (`html-companion-writer`) | Always |
+| 6 | Section-by-section feature specification (`html-companion-writer`) | Always |
+| 7 | Visual prototyping (`maister-mockup-studio`: browser HTML companion or ASCII) | UI-focused designs |
+| 8 | Layered product brief assembly & handoff to `/maister-development` | Always |
 
 ---
 
 ## Task Directory Structure
 
-All workflows create structured directories in `.maister/tasks/`:
+All orchestrators store artifacts under `.maister/tasks/<type>/YYYY-MM-DD-task-name/`:
 
-```
-.maister/tasks/
-├── development/           # All development tasks (features, bugs, enhancements)
-├── performance/           # Performance optimization
-├── migrations/            # Migrations
-├── research/              # Research
-└── product-design/        # Product design
-```
-
-Each task folder follows the pattern `YYYY-MM-DD-task-name/`:
-
-```
-2026-02-17-user-auth/
+```text
+2026-11-24-user-auth/
 ├── orchestrator-state.yml        # Workflow state (pause/resume, phase tracking)
+├── dashboard.html                # Static operator dashboard (auto-refreshes every 5s)
+├── dashboard-data.js             # Live dashboard state projection
 ├── analysis/
+│   ├── codebase-analysis.md      # Synthesized exploration findings
+│   ├── gap-analysis.md           # Current vs desired state & characteristics
 │   ├── requirements.md           # Gathered requirements
-│   ├── research-context/         # Research artifacts (if --research used)
-│   └── visuals/                  # UI mockups (if UI-heavy)
+│   ├── research-context/         # Imported research artifacts (when chained)
+│   └── design-context/           # HTML/ASCII mockups, brief, & screen INDEX.md
 ├── implementation/
-│   ├── spec.md                   # Specification (WHAT to build)
-│   ├── implementation-plan.md    # Step breakdown (HOW to build it)
-│   └── work-log.md              # Chronological activity log
-├── verification/                  # Verification reports
-└── documentation/                 # User-facing docs (optional)
+│   ├── spec.md / spec.html       # Specification + HTML companion
+│   ├── implementation-plan.md    # Task groups with Dependencies & Files to Modify
+│   ├── implementation-plan.html  # HTML companion with synced progress markers
+│   └── work-log.md               # Chronological wave & standards trail
+├── verification/                 # Completeness, test suite, code/pragmatic/reality/E2E reports
+└── documentation/                # End-user guide & screenshots (optional)
 ```
 
-## Internal Skills
+## Internal Machinery Skills
 
-These skills are machinery: an orchestrator invokes them, and none of them has a command of its
-own. Each one declares that in its own frontmatter (`user-invocable: false`).
+These five skills live in `skills/` and are executed in the main agent context by orchestrators (not invoked directly as user commands):
 
-| Skill | What It Does |
-|-------|-------------|
-| **codebase-analyzer** | Launches parallel exploration subagents sized to the task, then has a reporter subagent merge their findings into one report |
-| **docs-manager** | The engine behind `.maister/docs/`: file operations, the standards index, and the project instructions that point at it |
-| **implementation-plan-executor** | Runs an implementation plan by handing each task group to an implementer subagent, then records progress and the work log |
-| **implementation-verifier** | Delegates verification to specialists -- completeness, test suite, code review, pragmatic review, production readiness, reality check -- and compiles one report. It reports; it never fixes |
-| **orchestrator-framework** | Not executable at all: the shared patterns every orchestrator reads for phase execution, state, gates and initialization |
+| Skill | Purpose |
+|-------|---------|
+| `codebase-analyzer` | Dispatches adaptive parallel `research` subagents and merges findings via `codebase-analysis-reporter` |
+| `docs-manager` | Engine behind `.maister/docs/` (loaded by `docs-operator` subagent): file operations, `INDEX.md`, and `AGENTS.md` / `GEMINI.md` integration |
+| `implementation-plan-executor` | Computes disjoint parallel waves from `Dependencies` + `Files to Modify`, dispatches `task-group-implementer` subagents, and maintains `work-log.md` and `dashboard-data.js` |
+| `implementation-verifier` | Runs `test-suite-runner` followed by parallel specialist review subagents and compiles `implementation-verification.md` + `.html` |
+| `orchestrator-framework` | Shared specification of delegation rules, `ask_question` gates, YAML state contracts, HTML report styling, and `dashboard.html` |
